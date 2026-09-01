@@ -1,0 +1,994 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>강의 현황 대시보드</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg:#F4F0E8; --card:#FDFCF8; --border:#E2DDD5;
+  --primary:#1D9E75; --primary-light:#9FE1CB; --accent:#FAC775;
+  --text:#1F2A1F; --sub:#6B7A6C; --muted:#A8B5A9;
+  --danger:#C0392B; --danger-bg:#FFF5F5; --danger-border:#FFBDBD;
+  --warn:#B7791F; --warn-bg:#FFFBEB; --warn-border:#F6E05E;
+  --radius:14px; --radius-sm:8px;
+  --shadow:0 2px 12px rgba(31,42,31,0.07);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+
+/* Setup */
+#setup{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:2rem}
+.setup-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:2.5rem 2rem;max-width:440px;width:100%;box-shadow:var(--shadow);text-align:center}
+.setup-logo{font-size:11px;letter-spacing:2px;color:var(--sub);text-transform:uppercase;margin-bottom:6px}
+.setup-title{font-size:22px;font-weight:700;margin-bottom:8px}
+.setup-desc{font-size:14px;color:var(--sub);line-height:1.7;margin-bottom:2rem}
+.file-zone{border:2px dashed var(--border);border-radius:var(--radius-sm);padding:2rem;cursor:pointer;transition:border-color .2s,background .2s;margin-bottom:1.5rem;position:relative}
+.file-zone:hover{border-color:var(--primary);background:rgba(29,158,117,0.04)}
+.file-zone input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%}
+.file-zone-icon{font-size:36px;margin-bottom:10px}
+.file-zone-label{font-size:14px;color:var(--sub)}
+.file-zone-label strong{color:var(--primary)}
+.setup-note{font-size:12px;color:var(--muted);line-height:1.6}
+.error-box{background:var(--danger-bg);border:1px solid var(--danger-border);border-radius:var(--radius-sm);padding:12px 16px;font-size:13px;color:var(--danger);margin-top:1rem;text-align:left;display:none}
+
+/* Top bar */
+#dashboard{display:none;padding:0 0 4rem}
+.top-bar{background:#253427;padding:16px 32px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:10;gap:16px;flex-wrap:wrap}
+.top-bar-left{display:flex;flex-direction:column;gap:2px}
+.top-bar-brand{font-size:11px;letter-spacing:2px;color:#9FE1CB;text-transform:uppercase}
+.top-bar-title{font-size:18px;font-weight:700;color:#FFF}
+.top-bar-center{display:flex;gap:4px;background:rgba(0,0,0,0.2);border-radius:var(--radius-sm);padding:3px}
+.year-tab{padding:6px 16px;border-radius:6px;font-size:13px;font-weight:500;font-family:inherit;cursor:pointer;border:none;background:transparent;color:#8AAA8C;transition:all .15s}
+.year-tab.active{background:#1D9E75;color:#fff}
+.year-tab:hover:not(.active){background:rgba(255,255,255,0.08);color:#fff}
+.top-bar-right{display:flex;align-items:center;gap:8px}
+.top-bar-updated{font-size:11px;color:#8AAA8C}
+.btn{padding:6px 12px;border-radius:var(--radius-sm);font-size:12px;font-family:inherit;cursor:pointer;border:none;transition:opacity .15s}
+.btn:hover{opacity:.85}
+.btn-refresh{background:rgba(29,158,117,0.25);color:#9FE1CB;border:1px solid rgba(29,158,117,0.4)}
+.btn-reset{background:transparent;color:#6B8C6C;border:1px solid #3A4F3C}
+.btn-export{background:rgba(250,199,117,0.2);color:#FAC775;border:1px solid rgba(250,199,117,0.4)}
+.month-select{padding:6px 10px;border-radius:var(--radius-sm);font-size:12px;font-family:inherit;cursor:pointer;border:1px solid #3A4F3C;background:#2a3e2c;color:#9FE1CB;outline:none}
+.month-select:focus{border-color:var(--primary)}
+
+/* 월별 상세 강의 목록 */
+#monthDetail{display:block}
+.detail-item{background:var(--card);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px 18px;display:flex;align-items:flex-start;justify-content:space-between;gap:12px;box-shadow:var(--shadow);margin-bottom:8px}
+.detail-left{display:flex;flex-direction:column;gap:3px;flex:1}
+.detail-title{font-size:13px;font-weight:600;color:var(--text)}
+.detail-org{font-size:12px;color:var(--sub)}
+.detail-date{font-size:11px;color:var(--muted)}
+.detail-right{text-align:right;flex-shrink:0;display:flex;flex-direction:column;gap:3px}
+.detail-fee{font-size:15px;font-weight:700;color:var(--primary)}
+.detail-net{font-size:12px;color:var(--sub)}
+.detail-meta{font-size:11px;color:var(--muted)}
+.detail-badge{font-size:10px;font-weight:600;border-radius:4px;padding:1px 7px;border:1px solid;display:inline-block;margin-left:6px;vertical-align:middle}
+.badge-paid{color:#1D9E75;background:rgba(29,158,117,0.1);border-color:rgba(29,158,117,0.3)}
+.badge-unpaid{color:#B7791F;background:#FFFBEB;border-color:#F6E05E}
+.detail-summary{background:var(--card);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px 20px;display:flex;gap:24px;flex-wrap:wrap;margin-bottom:12px;box-shadow:var(--shadow)}
+.detail-sum-item{display:flex;flex-direction:column;gap:2px}
+.detail-sum-label{font-size:11px;color:var(--muted)}
+.detail-sum-value{font-size:16px;font-weight:700;color:var(--text)}
+
+/* Loading bar */
+#loadingBar{background:var(--card);border-bottom:1px solid var(--border);padding:16px 32px;display:none;align-items:center;gap:12px;font-size:14px;color:var(--sub)}
+.spinner{width:20px;height:20px;border:2px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:spin 0.8s linear infinite;flex-shrink:0}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+.container{max-width:1100px;margin:0 auto;padding:28px 24px 0}
+.section-label{font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:12px;margin-top:28px}
+.section-label:first-child{margin-top:0}
+
+/* KPI */
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin-bottom:6px}
+.kpi-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px;box-shadow:var(--shadow)}
+.kpi-card.highlight{border-color:rgba(29,158,117,0.35);background:rgba(29,158,117,0.04)}
+.kpi-label{font-size:12px;color:var(--sub);margin-bottom:10px}
+.kpi-value{font-size:24px;font-weight:700;letter-spacing:-0.5px;color:var(--text)}
+.kpi-value.green{color:var(--primary)}
+.kpi-value.blue{color:#2563EB}
+.kpi-sub{font-size:11px;color:var(--muted);margin-top:6px}
+
+/* Payment */
+.pay-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:6px}
+.pay-card{border-radius:var(--radius);padding:18px 20px;box-shadow:var(--shadow)}
+.pay-card.paid{background:#F0FBF6;border:1px solid rgba(29,158,117,0.3)}
+.pay-card.unpaid{background:var(--warn-bg);border:1px solid var(--warn-border)}
+.pay-card-label{font-size:12px;color:var(--sub);margin-bottom:8px}
+.pay-card-value{font-size:26px;font-weight:700;letter-spacing:-0.5px}
+.pay-card.paid .pay-card-value{color:var(--primary)}
+.pay-card.unpaid .pay-card-value{color:var(--warn)}
+.pay-card-sub{font-size:11px;color:var(--muted);margin-top:6px}
+
+/* Charts */
+.chart-row{display:grid;grid-template-columns:3fr 2fr;gap:16px;margin-bottom:6px}
+.chart-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:20px 22px;box-shadow:var(--shadow)}
+.chart-title{font-size:14px;font-weight:500;margin-bottom:16px}
+.legend{display:flex;gap:16px;justify-content:center;margin-top:10px}
+.legend-item{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--sub)}
+.legend-dot{width:10px;height:10px;border-radius:2px}
+
+/* Table */
+.table-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:20px 22px;box-shadow:var(--shadow);overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px}
+thead th{text-align:right;padding:7px 12px;color:var(--sub);font-weight:400;border-bottom:1px solid var(--border);font-size:12px}
+thead th:first-child{text-align:left}
+tbody td{padding:8px 12px;text-align:right}
+tbody td:first-child{text-align:left}
+tbody tr:hover{background:rgba(29,158,117,0.025)}
+.cur-row td{background:rgba(29,158,117,0.05)}
+.cur-badge{font-size:10px;background:rgba(29,158,117,0.15);color:var(--primary);border-radius:4px;padding:1px 6px;margin-left:6px;border:1px solid rgba(29,158,117,0.25)}
+.year-row td{background:#F4F0E8;font-size:11px;font-weight:700;letter-spacing:1px;color:var(--sub);text-transform:uppercase;padding:6px 12px;border-top:2px solid var(--border)}
+tfoot td{padding:9px 12px;text-align:right;border-top:2px solid var(--border);font-weight:700}
+tfoot td:first-child{text-align:left}
+.muted{color:var(--muted)}
+.net{color:var(--primary);font-weight:500}
+
+/* Unpaid list */
+.unpaid-list{display:flex;flex-direction:column;gap:10px}
+.unpaid-item{background:var(--card);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px 18px;display:flex;align-items:center;justify-content:space-between;gap:12px;box-shadow:var(--shadow)}
+.unpaid-item.overdue-long{border-left:3px solid var(--danger)}
+.unpaid-item.overdue-mid{border-left:3px solid var(--warn)}
+.unpaid-item.overdue-short{border-left:3px solid #CBD5E0}
+.unpaid-left{display:flex;flex-direction:column;gap:3px}
+.unpaid-title{font-size:13px;font-weight:500;color:var(--text)}
+.unpaid-org{font-size:12px;color:var(--sub)}
+.unpaid-date{font-size:11px;color:var(--muted)}
+.unpaid-right{text-align:right;flex-shrink:0}
+.unpaid-amount{font-size:15px;font-weight:700;color:var(--warn)}
+.unpaid-days{font-size:11px;color:var(--muted);margin-top:2px}
+.empty-state{text-align:center;padding:2rem;color:var(--muted);font-size:14px}
+.footer{text-align:center;font-size:12px;color:var(--muted);margin-top:2rem}
+
+@media(max-width:640px){
+  .chart-row{grid-template-columns:1fr}
+  .kpi-grid{grid-template-columns:repeat(2,1fr)}
+  .pay-row{grid-template-columns:1fr}
+  .top-bar{padding:12px 16px}
+  .container{padding:20px 16px 0}
+  .unpaid-item{flex-direction:column;align-items:flex-start}
+  .unpaid-right{text-align:left}
+}
+</style>
+</head>
+<body>
+
+<!-- Setup -->
+<style>
+.setup-section{margin-bottom:1.5rem;text-align:left}
+.setup-section-label{font-size:12px;font-weight:500;color:var(--sub);margin-bottom:8px}
+.setup-input{width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;font-family:inherit;background:var(--card);color:var(--text);outline:none}
+.setup-input:focus{border-color:var(--primary)}
+.setup-input::placeholder{color:var(--muted)}
+.setup-guide{background:#F0FBF6;border:1px solid rgba(29,158,117,0.2);border-radius:var(--radius-sm);padding:12px 14px;font-size:12px;color:var(--sub);line-height:1.7;margin-bottom:1.5rem;text-align:left}
+.setup-guide a{color:var(--primary);text-decoration:none}
+.setup-guide a:hover{text-decoration:underline}
+</style>
+<div id="setup">
+  <div class="setup-card">
+    <div class="setup-logo">강의 현황 대시보드</div>
+    <div class="setup-title">내 강의 데이터 연결</div>
+    <div class="setup-desc">Google Calendar와 연결해서 강의 매출·입금 현황을 자동으로 확인하세요.</div>
+
+    <div class="setup-guide">
+      💡 <strong>처음 사용하시나요?</strong><br>
+      1. <a href="https://console.cloud.google.com" target="_blank">Google Cloud Console</a>에서 서비스 계정 JSON 키 발급<br>
+      2. 출강일정 캘린더를 서비스 계정 이메일과 공유<br>
+      3. 아래에 캘린더 ID와 JSON 파일 등록
+    </div>
+
+    <div class="setup-section">
+      <div class="setup-section-label">① 이름 (대시보드 상단에 표시)</div>
+      <input type="text" id="inputName" class="setup-input" placeholder="예: 홍길동 강사">
+    </div>
+
+    <div class="setup-section">
+      <div class="setup-section-label">② 출강일정 캘린더 ID</div>
+      <input type="text" id="inputCalendarId" class="setup-input" placeholder="예: xxxxx@group.calendar.google.com">
+      <div style="font-size:11px;color:var(--muted);margin-top:5px">Google 캘린더 → 설정 → 캘린더 ID에서 확인 가능해요</div>
+    </div>
+
+    <div class="setup-section">
+      <div class="setup-section-label">③ 서비스 계정 JSON 키 파일</div>
+      <div class="file-zone" id="fileZone">
+        <input type="file" id="jsonFile" accept=".json" onchange="loadCredentials(this)">
+        <div class="file-zone-icon">📄</div>
+        <div class="file-zone-label"><strong>JSON 파일 선택</strong> 또는 여기에 드래그</div>
+      </div>
+    </div>
+
+    <div class="setup-note">모든 정보는 이 기기에만 저장되며 외부로 전송되지 않습니다.</div>
+    <div class="error-box" id="setupError"></div>
+  </div>
+</div>
+
+<!-- Dashboard -->
+<div id="dashboard">
+  <div class="top-bar">
+    <div class="top-bar-left">
+      <div class="top-bar-brand" id="topBrand">강의 현황</div>
+      <div class="top-bar-title" id="topTitle">2026 강의 현황</div>
+    </div>
+    <div class="top-bar-center">
+      <button class="year-tab" id="tab-2025" onclick="switchYear('2025')">2025</button>
+      <button class="year-tab active" id="tab-2026" onclick="switchYear('2026')">2026</button>
+      <button class="year-tab" id="tab-all" onclick="switchYear('all')">통합</button>
+    </div>
+    <div class="top-bar-right">
+      <select id="monthFilter" class="month-select" onchange="switchMonth(this.value)">
+        <option value="all">전체 월</option>
+        <option value="1">1월</option><option value="2">2월</option><option value="3">3월</option>
+        <option value="4">4월</option><option value="5">5월</option><option value="6">6월</option>
+        <option value="7">7월</option><option value="8">8월</option><option value="9">9월</option>
+        <option value="10">10월</option><option value="11">11월</option><option value="12">12월</option>
+      </select>
+      <div class="top-bar-updated" id="updatedTime"></div>
+      <button class="btn btn-refresh" onclick="refresh()">↻ 새로고침</button>
+      <button class="btn btn-export" onclick="exportExcel()">⬇ 엑셀</button>
+      <button class="btn btn-reset" onclick="resetCredentials()">키 초기화</button>
+    </div>
+  </div>
+
+  <div id="loadingBar">
+    <div class="spinner"></div>
+    <span id="loadingMsg">캘린더 데이터 불러오는 중...</span>
+  </div>
+
+  <div class="container">
+    <!-- 매출 & 수익 -->
+    <div class="section-label">💰 매출 &amp; 수익</div>
+    <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(200px,1fr))">
+      <div class="kpi-card highlight">
+        <div class="kpi-label">총 매출액 (연간)</div>
+        <div class="kpi-value" id="kpi-total-sales">-</div>
+        <div class="kpi-sub">세전강사비 + 재료비청구 + 기타수입</div>
+      </div>
+      <div class="kpi-card highlight">
+        <div class="kpi-label" id="kpi-today-label">총 매출액 (오늘 기준)</div>
+        <div class="kpi-value blue" id="kpi-today-sales">-</div>
+        <div class="kpi-sub" id="kpi-today-sub">완료된 강의만 집계</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">강사비 총액 (세전)</div>
+        <div class="kpi-value" id="kpi-gross">-</div>
+        <div class="kpi-sub" id="kpi-gross-sub"></div>
+      </div>
+      <div class="kpi-card highlight">
+        <div class="kpi-label">순수익</div>
+        <div class="kpi-value green" id="kpi-net">-</div>
+        <div class="kpi-sub">세후강사비 + 재료비청구 - 재료비지출 + 기타수입</div>
+      </div>
+    </div>
+
+    <!-- 활동 현황 -->
+    <div class="section-label" style="margin-top:20px">📊 활동 현황</div>
+    <div class="kpi-grid">
+      <div class="kpi-card">
+        <div class="kpi-label">누적 강의</div>
+        <div class="kpi-value" id="kpi-count">-</div>
+        <div class="kpi-sub" id="kpi-count-sub"></div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">누적 시간</div>
+        <div class="kpi-value" id="kpi-hours">-</div>
+        <div class="kpi-sub" id="kpi-hours-sub"></div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">회당 평균 순수익</div>
+        <div class="kpi-value" id="kpi-avg">-</div>
+        <div class="kpi-sub">재료비 포함 기준</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">누적 수강생</div>
+        <div class="kpi-value" id="kpi-students">-</div>
+        <div class="kpi-sub" id="kpi-students-sub"></div>
+      </div>
+    </div>
+
+    <!-- Charts -->
+    <div class="section-label">📈 월별 추이</div>
+    <div class="chart-row">
+      <div class="chart-card">
+        <div class="chart-title">월별 강사비 &amp; 순수익 (만원)</div>
+        <div style="position:relative;height:200px"><canvas id="revenueChart"></canvas></div>
+        <div class="legend">
+          <span class="legend-item"><span class="legend-dot" style="background:#9FE1CB"></span>강사비</span>
+          <span class="legend-item"><span class="legend-dot" style="background:#1D9E75"></span>순수익</span>
+        </div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">월별 강의 횟수</div>
+        <div style="position:relative;height:200px"><canvas id="countChart"></canvas></div>
+      </div>
+    </div>
+
+    <!-- Monthly table -->
+    <div class="section-label">🗓 월별 상세</div>
+    <div class="table-card" style="margin-bottom:6px">
+      <table>
+        <thead>
+          <tr>
+            <th style="text-align:left">월</th>
+            <th>횟수</th>
+            <th>강사비(세전)</th>
+            <th>총매출</th>
+            <th>순수익</th>
+            <th>강의시간</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+        <tfoot><tr id="tableFooter"></tr></tfoot>
+      </table>
+    </div>
+
+    <!-- 입금 현황 -->
+    <div class="section-label" style="margin-top:28px">🏦 입금 현황 (오늘 기준)</div>
+    <div class="pay-row">
+      <div class="pay-card paid">
+        <div class="pay-card-label">✅ 입금 완료</div>
+        <div class="pay-card-value" id="pay-done">-</div>
+        <div class="pay-card-sub" id="pay-done-sub"></div>
+      </div>
+      <div class="pay-card unpaid">
+        <div class="pay-card-label">⏳ 미입금 (강의 완료 후)</div>
+        <div class="pay-card-value" id="pay-undone">-</div>
+        <div class="pay-card-sub" id="pay-undone-sub"></div>
+      </div>
+    </div>
+
+    <!-- 미입금 리스트 -->
+    <div class="section-label" style="margin-top:20px">🔴 미입금 일정 (오래된 순)</div>
+    <div id="unpaidList" class="unpaid-list"></div>
+
+    <!-- 월별 상세 강의 목록 -->
+    <div id="monthDetail">
+      <div class="section-label" style="margin-top:28px" id="monthDetailLabel">📋 강의 상세 목록</div>
+      <div class="detail-summary" id="monthDetailSummary"></div>
+      <div id="monthDetailList"></div>
+    </div>
+
+    <div class="footer" id="footerNote"></div>
+  </div>
+</div>
+
+<script>
+let CALENDAR_ID = '7ffe56dcdeff6356eb685f3c4eb812a65eb4d0dbc5c969e2adf55f8b42bc79c5@group.calendar.google.com';
+const MONTHS = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
+let revenueChart, countChart;
+let currentMode = '2026';
+let currentMonth = 'all';
+let allEvents = []; // 개별 강의 데이터 저장용
+
+// ── 유틸 ──
+function fmt(n) {
+  if (!n && n !== 0) return '-';
+  const abs = Math.abs(n), s = n < 0 ? '-' : '';
+  if (abs >= 100000000) return `${s}${(abs/100000000).toFixed(1)}억원`;
+  const man = Math.floor(abs/10000), rem = abs % 10000;
+  if (man > 0 && rem === 0) return `${s}${man}만원`;
+  if (man > 0) return `${s}${man}만 ${rem.toLocaleString()}원`;
+  return `${s}${abs.toLocaleString()}원`;
+}
+
+function parseKoreanMoney(str) {
+  if (!str) return 0;
+  str = str.replace(/,/g,'').replace(/약\s*/g,'').replace(/원고료\s*/g,'').trim();
+  const neg = str.match(/\(-?([\d만\s]+)원?\)/);
+  if (neg) {
+    const inner = neg[1].replace(/,/g,'');
+    const m2 = inner.match(/(\d+)만\s*(\d+)?/);
+    if (m2) return -(parseInt(m2[1])*10000 + (m2[2]?parseInt(m2[2]):0));
+    return -parseInt(inner);
+  }
+  const m = str.match(/(-?)(\d+)만\s*(\d+)?원?/);
+  if (m) return (m[1]?-1:1)*(parseInt(m[2])*10000+(m[3]?parseInt(m[3]):0));
+  const m2 = str.match(/(-?)([\d]+)원?/);
+  if (m2) return (m2[1]?-1:1)*parseInt(m2[2]);
+  return 0;
+}
+
+function getLine(lines, key) {
+  const line = lines.find(l => l.trim().startsWith(key+':'));
+  return line ? line.split(':').slice(1).join(':').trim() : '';
+}
+
+// ── 연도 모드 ──
+function getDateRange(mode) {
+  if (mode === '2025') return { timeMin:'2025-01-01T00:00:00+09:00', timeMax:'2025-12-31T23:59:59+09:00', years:[2025] };
+  if (mode === '2026') return { timeMin:'2026-01-01T00:00:00+09:00', timeMax:'2026-12-31T23:59:59+09:00', years:[2026] };
+  return { timeMin:'2025-01-01T00:00:00+09:00', timeMax:'2026-12-31T23:59:59+09:00', years:[2025,2026] };
+}
+
+function getModeLabel(mode) {
+  if (mode === '2025') return '2025 강의 현황';
+  if (mode === '2026') return '2026 강의 현황';
+  return '2025~2026 통합 현황';
+}
+
+function switchYear(mode) {
+  if (mode === currentMode) return;
+  currentMode = mode;
+  ['2025','2026','all'].forEach(m => {
+    document.getElementById(`tab-${m}`).classList.toggle('active', m === mode);
+  });
+  document.getElementById('topTitle').textContent = getModeLabel(mode);
+  refresh();
+}
+
+function switchMonth(val) {
+  currentMonth = val;
+  renderMonthDetail();
+}
+
+function renderMonthDetail() {
+  const detailSection = document.getElementById('monthDetail');
+  const listEl = document.getElementById('monthDetailList');
+  const summaryEl = document.getElementById('monthDetailSummary');
+  const labelEl = document.getElementById('monthDetailLabel');
+
+  detailSection.style.display = 'block';
+
+  // 연도 + 월 필터
+  let filtered = allEvents.filter(ev => {
+    const yearMatch = currentMode === 'all' ? true : ev.year === parseInt(currentMode);
+    const monthMatch = currentMonth === 'all' ? true : ev.month === parseInt(currentMonth) - 1;
+    return yearMatch && monthMatch;
+  }).sort((a,b) => a.start - b.start);
+
+  // 레이블
+  const modeYear = currentMode === 'all' ? '전체' : currentMode+'년';
+  const moLabel  = currentMonth === 'all' ? '전체' : currentMonth+'월';
+  labelEl.textContent = `📋 강의 전체 내역 · ${modeYear} ${moLabel === '전체' ? '' : moLabel} (${filtered.length}건)`;
+
+  if (filtered.length === 0) {
+    summaryEl.innerHTML = '';
+    listEl.innerHTML = '<div class="empty-state">해당 기간에 강의 데이터가 없습니다.</div>';
+    return;
+  }
+
+  // 요약
+  const sumFee  = filtered.reduce((a,e) => a+e.강사비, 0);
+  const sumNet  = filtered.reduce((a,e) => a+e.순수익, 0);
+  const sumHour = filtered.reduce((a,e) => a+e.시간, 0);
+  const paidCnt = filtered.filter(e => e.입금상태 === '입금완료' || e.입금상태 === '부분입금').length;
+  const unpaidCnt = filtered.filter(e => e.입금상태 !== '입금완료' && e.입금상태 !== '예정' && e.입금상태 !== '부분입금').length;
+  summaryEl.innerHTML = `
+    <div class="detail-sum-item"><div class="detail-sum-label">총 강의 횟수</div><div class="detail-sum-value">${filtered.length}회</div></div>
+    <div class="detail-sum-item"><div class="detail-sum-label">강사비 합계</div><div class="detail-sum-value">${fmt(sumFee)}</div></div>
+    <div class="detail-sum-item"><div class="detail-sum-label">순수익 합계</div><div class="detail-sum-value" style="color:var(--primary)">${fmt(sumNet)}</div></div>
+    <div class="detail-sum-item"><div class="detail-sum-label">총 강의시간</div><div class="detail-sum-value">${sumHour.toFixed(1)}h</div></div>
+    <div class="detail-sum-item"><div class="detail-sum-label">입금완료</div><div class="detail-sum-value" style="color:#1D9E75">${paidCnt}건</div></div>
+    <div class="detail-sum-item"><div class="detail-sum-label">미입금</div><div class="detail-sum-value" style="color:#B7791F">${unpaidCnt}건</div></div>
+  `;
+
+  // 입금 상태별 색상/텍스트
+  const badgeInfo = {
+    '입금완료':  {color:'#1D9E75', bg:'rgba(29,158,117,0.1)', border:'rgba(29,158,117,0.3)'},
+    '부분입금':  {color:'#2563EB', bg:'rgba(37,99,235,0.1)',  border:'rgba(37,99,235,0.3)'},
+    '미입금':    {color:'#B7791F', bg:'#FFFBEB',             border:'#F6E05E'},
+    '강사비 미입금': {color:'#B7791F', bg:'#FFFBEB',         border:'#F6E05E'},
+    '재료비 미입금': {color:'#2563EB', bg:'rgba(37,99,235,0.08)', border:'rgba(37,99,235,0.3)'},
+    '전액 미입금':   {color:'#C0392B', bg:'#FFF5F5',         border:'#FFBDBD'},
+    '예정':      {color:'#6B7A6C', bg:'rgba(107,122,108,0.1)', border:'rgba(107,122,108,0.3)'},
+    '도급':      {color:'#6B7A6C', bg:'rgba(107,122,108,0.1)', border:'rgba(107,122,108,0.3)'},
+  };
+
+  listEl.innerHTML = '';
+  filtered.forEach(ev => {
+    const dateStr = ev.start.toLocaleDateString('ko-KR',{year:'numeric',month:'long',day:'numeric',weekday:'short'});
+    const timeStr = ev.start.toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'})
+                  + ' ~ ' + ev.end.toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'});
+    const badge = badgeInfo[ev.입금상태] || badgeInfo['예정'];
+    const div = document.createElement('div');
+    div.className = 'detail-item';
+    div.innerHTML = `
+      <div class="detail-left">
+        <div class="detail-title">
+          ${ev.title}
+          <span style="font-size:10px;font-weight:600;color:${badge.color};background:${badge.bg};border:1px solid ${badge.border};border-radius:4px;padding:1px 7px;margin-left:6px;vertical-align:middle">${ev.입금상태}</span>
+        </div>
+        ${ev.기관 ? `<div class="detail-org">${ev.기관}</div>` : ''}
+        <div class="detail-date">📅 ${dateStr} · ${timeStr} · ${ev.시간.toFixed(1)}h</div>
+      </div>
+      <div class="detail-right">
+        <div class="detail-fee">${fmt(ev.강사비)}</div>
+        <div class="detail-net">순수익 ${fmt(ev.순수익)}</div>
+        ${ev.수강인원 ? `<div class="detail-meta">${ev.수강인원}명</div>` : ''}
+      </div>
+    `;
+    listEl.appendChild(div);
+  });
+}
+
+function exportExcel() {
+  // 내보낼 데이터: currentMode 기준 전체 or 해당 월
+  let data = allEvents;
+  if (currentMode !== 'all') data = data.filter(e => e.year === parseInt(currentMode));
+  if (currentMonth !== 'all') data = data.filter(e => e.month === parseInt(currentMonth)-1);
+
+  if (data.length === 0) { alert('내보낼 데이터가 없습니다.'); return; }
+
+  // CSV 생성 (Excel에서 열 수 있음)
+  const BOM = '\uFEFF';
+  const headers = ['날짜','시간','요일','제목','기관','강사비(세전)','순수익','강의시간(h)','수강인원','입금상태'];
+  const rows = data.sort((a,b)=>a.start-b.start).map(ev => {
+    const d = ev.start;
+    const date = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    const time = d.toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'});
+    const days = ['일','월','화','수','목','금','토'];
+    const weekday = days[d.getDay()];
+    return [
+      date, time, weekday,
+      `"${ev.title.replace(/"/g,'""')}"`,
+      `"${(ev.기관||'').replace(/"/g,'""')}"`,
+      ev.강사비, ev.순수익,
+      ev.시간.toFixed(1),
+      ev.수강인원 || '',
+      ev.입금상태 || ''
+    ].join(',');
+  });
+
+  const csv = BOM + headers.join(',') + '\n' + rows.join('\n');
+  const blob = new Blob([csv], {type:'text/csv;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const modeLabel = currentMode === 'all' ? '전체' : currentMode;
+  const moLabel = currentMonth === 'all' ? '' : `_${currentMonth}월`;
+  a.href = url;
+  a.download = `강의내역_${modeLabel}${moLabel}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ── JWT & Auth ──
+function b64url(str){ return btoa(unescape(encodeURIComponent(str))).replace(/=/g,'').replace(/\+/g,'-').replace(/\//g,'_'); }
+function b64urlBuf(buf){ return btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/=/g,'').replace(/\+/g,'-').replace(/\//g,'_'); }
+
+async function getAccessToken(creds) {
+  const now = Math.floor(Date.now()/1000);
+  const header = b64url(JSON.stringify({alg:'RS256',typ:'JWT'}));
+  const payload = b64url(JSON.stringify({
+    iss:creds.client_email,
+    scope:'https://www.googleapis.com/auth/calendar.readonly',
+    aud:'https://oauth2.googleapis.com/token',
+    exp:now+3600, iat:now
+  }));
+  const sigInput = `${header}.${payload}`;
+  const pem = creds.private_key.replace(/-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----|\n/g,'');
+  const der = Uint8Array.from(atob(pem), c=>c.charCodeAt(0));
+  const key = await crypto.subtle.importKey('pkcs8', der.buffer, {name:'RSASSA-PKCS1-v1_5',hash:'SHA-256'}, false, ['sign']);
+  const sig = await crypto.subtle.sign('RSASSA-PKCS1-v1_5', key, new TextEncoder().encode(sigInput));
+  const jwt = `${sigInput}.${b64urlBuf(sig)}`;
+  const res = await fetch('https://oauth2.googleapis.com/token', {
+    method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'},
+    body:`grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=${jwt}`
+  });
+  const data = await res.json();
+  if (!data.access_token) throw new Error('토큰 발급 실패: '+JSON.stringify(data));
+  return data.access_token;
+}
+
+async function fetchEvents(token, mode) {
+  const {timeMin, timeMax} = getDateRange(mode);
+  const params = new URLSearchParams({timeMin, timeMax, maxResults:'500', singleEvents:'true', orderBy:'startTime'});
+  const res = await fetch(
+    `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(CALENDAR_ID)}/events?${params}`,
+    {headers:{Authorization:`Bearer ${token}`}}
+  );
+  const data = await res.json();
+  if (data.error) throw new Error(data.error.message);
+  return data.items || [];
+}
+
+// ── 데이터 파싱 ──
+function parseEvents(items, mode) {
+  const today = new Date(); today.setHours(0,0,0,0);
+  const isAll = mode === 'all';
+  const slotCount = isAll ? 24 : 12;
+
+  // 월별 슬롯 생성
+  const monthly = Array.from({length: slotCount}, (_, i) => {
+    let label, year, month;
+    if (isAll) {
+      year  = i < 12 ? 2025 : 2026;
+      month = i % 12;
+      label = `${String(year).slice(2)}.${month+1}월`;
+    } else {
+      year  = parseInt(mode);
+      month = i;
+      label = MONTHS[i];
+    }
+    return {label, year, month, 강사비:0, 매출:0, 순수익:0, 횟수:0, 시간:0};
+  });
+
+  let total = {강사비:0, 매출:0, 순수익:0, 횟수:0, 시간:0, 수강인원:0};
+  let today_매출 = 0;
+  let paidAmount=0, paidCount=0, unpaidAmount=0;
+  const unpaidEvents = [];
+  const events = []; // 개별 강의 데이터
+
+  items.forEach(ev => {
+    if (!ev.start?.dateTime) return;
+    const desc = ev.description || '';
+    if (!desc.includes('강사비:')) return;
+
+    const lines = desc.split('\n');
+    const 강사비Raw = getLine(lines,'강사비').split('(')[0].trim();
+    const 강사비 = parseKoreanMoney(강사비Raw);
+    const 순수익 = parseKoreanMoney(getLine(lines,'실수령').trim());
+    const 재료비청구 = parseKoreanMoney(getLine(lines,'재료비 청구'));
+    const 재료비지출 = parseKoreanMoney(getLine(lines,'재료비 지출'));
+    const 기타수입 = parseKoreanMoney(getLine(lines,'기타수입'));
+    const 매출 = 강사비 + 재료비청구 + 기타수입;
+    // 세후강사비 = 강사비 - 세금 - 에이전시비 (직접 계산, 교통비·재료비 영향 없음)
+    const 세금Raw = getLine(lines,'세금');
+    const 세금액 = (() => {
+      // "사업소득 3.3% (-9,900원)" 또는 "비과세 0%" 형식
+      if (세금Raw.includes('비과세')) return 0;
+      const m = 세금Raw.match(/\(-?\s*([\d,]+)원?\)/);
+      return m ? parseInt(m[1].replace(/,/g,'')) : 0;
+    })();
+    const 에이전시Raw = getLine(lines,'에이전시비');
+    const 에이전시액 = (() => {
+      if (!에이전시Raw) return 0;
+      const m = 에이전시Raw.match(/-\s*([\d만\s,]+)원/);
+      if (!m) return 0;
+      return parseKoreanMoney(m[1].replace(/,/g,'').trim()+'원');
+    })();
+    const 세후강사비 = 강사비 - 세금액 - 에이전시액;
+    const 기관 = getLine(lines,'기관') || '';
+    const 수강인원Raw = getLine(lines,'수강인원').split('(')[0].replace(/[^0-9]/g,'');
+    const 수강인원 = 수강인원Raw ? parseInt(수강인원Raw) : 0;
+
+    const start  = new Date(ev.start.dateTime);
+    const end    = new Date(ev.end.dateTime);
+    const 시간   = (end - start) / 3600000;
+    const evYear = start.getFullYear();
+    const evMonth= start.getMonth();
+    const isPast = start < today;
+
+    // 슬롯 인덱스 계산
+    let idx = -1;
+    if (isAll) {
+      if (evYear === 2025) idx = evMonth;
+      else if (evYear === 2026) idx = 12 + evMonth;
+    } else {
+      if (evYear === parseInt(mode)) idx = evMonth;
+    }
+    if (idx < 0 || idx >= slotCount) return;
+
+    monthly[idx].강사비 += 강사비;
+    monthly[idx].매출   += 매출;
+    monthly[idx].순수익 += 순수익;
+    monthly[idx].횟수   += 1;
+    monthly[idx].시간   += 시간;
+    total.강사비  += 강사비;
+    total.매출    += 매출;
+    total.순수익  += 순수익;
+    total.횟수    += 1;
+    total.시간    += 시간;
+    total.수강인원 += 수강인원;
+    if (isPast) today_매출 += 매출;
+
+    // 입금 현황 (지난 일정만) — 먼저 입금 상태 파악 후 events에 저장
+    if (!isPast) {
+      events.push({
+        title: ev.summary || '(제목 없음)',
+        기관, start, end,
+        year: evYear, month: evMonth,
+        강사비, 순수익, 매출, 시간, 수강인원,
+        isPast: false,
+        입금상태: '예정'
+      });
+      return;
+    }
+
+    const has재료비 = 재료비청구 > 0;
+
+    // ── 도급계약 감지 ──
+    // '총 도급금액:' 라인이 있으면 도급계약 이벤트로 처리
+    const 도급금액라인 = lines.find(l => l.startsWith('총 도급금액:'));
+    const is도급 = !!도급금액라인;
+
+    if (is도급) {
+      // 도급계약: 대표 이벤트(입금확인 기재 위치)에서만 입금 처리
+      // 입금확인(도급1차/2차/3차) 태그 파싱 → 해당 고정금액 가산
+      const DOGEUP_AMOUNTS = { '도급1차': 4530000, '도급2차': 2265000, '도급3차': 2264000 };
+      let 도급입금합계 = 0;
+      for (const [key, amt] of Object.entries(DOGEUP_AMOUNTS)) {
+        if (desc.includes(`입금확인(${key})`)) 도급입금합계 += amt;
+      }
+
+      // 대표 이벤트 여부 (입금확인 기재 위치 안내 문구 있음)
+      const is대표 = desc.includes('입금확인 기재 위치');
+
+      if (is대표) {
+        // 대표 이벤트에서 도급 입금 처리
+        paidAmount += 도급입금합계;
+        if (도급입금합계 > 0) paidCount++;
+        // 미입금 계산: 전체 도급금액에서 이미 받은 금액 차감
+        const TOTAL_DOGEUP = 9059000;
+        const 도급미입금 = TOTAL_DOGEUP - 도급입금합계;
+        if (도급미입금 > 0) {
+          unpaidAmount += 도급미입금;
+          const diffDays = Math.floor((today - start) / 86400000);
+          // 어떤 차수가 미입금인지 파악
+          const 미입금차수 = Object.entries(DOGEUP_AMOUNTS)
+            .filter(([k]) => !desc.includes(`입금확인(${k})`))
+            .map(([k]) => k.replace('도급',''))
+            .join('·');
+          unpaidEvents.push({
+            title: '의왕시 청년발전소 (도급계약 묶음)',
+            기관: '의왕시 청년발전소',
+            date: start, diffDays,
+            status: `${미입금차수}차 미입금`,
+            미입금강사비: 도급미입금, 미입금재료비: 0, 미입금합계: 도급미입금
+          });
+        }
+      }
+      // 도급계약 이벤트: events에 추가 후 건너뜀
+      events.push({
+        title: ev.summary || '(제목 없음)',
+        기관, start, end,
+        year: evYear, month: evMonth,
+        강사비, 순수익, 매출, 시간, 수강인원,
+        isPast: true,
+        입금상태: is도급 ? (도급입금합계 >= 9059000 ? '입금완료' : '부분입금') : '도급'
+      });
+      return;
+    }
+
+    // ── 일반 이벤트 입금 처리 ──
+    const 강사비입금 = desc.includes('입금확인(강사비)') || /입금확인(?!\()/.test(desc);
+    const 재료비입금 = desc.includes('입금확인(재료비)');
+
+    if (강사비입금) paidAmount += 세후강사비;
+    if (재료비입금) paidAmount += 재료비청구;
+
+    const 미입금강사비 = 강사비입금 ? 0 : 세후강사비;
+    const 미입금재료비 = (has재료비 && !재료비입금) ? 재료비청구 : 0;
+    const 미입금합계  = 미입금강사비 + 미입금재료비;
+
+    let 입금상태 = '입금완료';
+    if (미입금합계 > 0) {
+      unpaidAmount += 미입금합계;
+      const diffDays = Math.floor((today - start) / 86400000);
+      let status = '미입금';
+      if (!강사비입금 && has재료비 && 재료비입금)  status = '강사비 미입금';
+      else if (강사비입금 && has재료비 && !재료비입금) status = '재료비 미입금';
+      else if (!강사비입금 && has재료비 && !재료비입금) status = '전액 미입금';
+      unpaidEvents.push({title:ev.summary||'(제목 없음)', 기관, date:start, diffDays, status, 미입금강사비, 미입금재료비, 미입금합계});
+      if (강사비입금 || 재료비입금) paidCount++;
+      if (강사비입금 && (!has재료비 || 재료비입금)) paidCount++;
+      입금상태 = status;
+    } else { paidCount++; }
+
+    events.push({
+      title: ev.summary || '(제목 없음)',
+      기관, start, end,
+      year: evYear, month: evMonth,
+      강사비, 순수익, 매출, 시간, 수강인원,
+      isPast: true, 입금상태
+    });
+  });
+
+  unpaidEvents.sort((a,b) => a.date - b.date);
+  return {monthly, total, today_매출, paidAmount, paidCount, unpaidAmount, unpaidEvents, events};
+}
+
+// ── 렌더링 ──
+function renderDashboard({monthly, total, today_매출, paidAmount, paidCount, unpaidAmount, unpaidEvents, events}, mode) {
+  allEvents = events || [];
+  renderMonthDetail();
+  const today   = new Date();
+  const todayYr = today.getFullYear();
+  const todayMo = today.getMonth();
+  const isAll   = mode === 'all';
+
+  // 월별 label 수 동적
+  const avgDivisor = isAll ? 24 : 12;
+
+  // ① 매출/수익 KPI
+  document.getElementById('kpi-total-sales').textContent = fmt(total.매출);
+  document.getElementById('kpi-today-sales').textContent = fmt(today_매출);
+  document.getElementById('kpi-today-label').textContent = isAll ? '총 매출액 (오늘 기준)' : '총 매출액 (오늘 기준)';
+  document.getElementById('kpi-gross').textContent = fmt(total.강사비);
+  document.getElementById('kpi-gross-sub').textContent = `누적 ${total.횟수}회 강의`;
+  document.getElementById('kpi-net').textContent = fmt(total.순수익);
+
+  // ② 활동 KPI
+  document.getElementById('kpi-count').textContent = `${total.횟수}회`;
+  document.getElementById('kpi-count-sub').textContent = `월평균 ${(total.횟수/avgDivisor).toFixed(1)}회`;
+  document.getElementById('kpi-hours').textContent = `${total.시간.toFixed(1)}h`;
+  document.getElementById('kpi-hours-sub').textContent = `월평균 ${(total.시간/avgDivisor).toFixed(1)}h`;
+  document.getElementById('kpi-avg').textContent = total.횟수>0 ? fmt(Math.round(total.순수익/total.횟수)) : '-';
+  document.getElementById('kpi-students').textContent = total.수강인원>0 ? `${total.수강인원.toLocaleString()}명` : '-';
+  document.getElementById('kpi-students-sub').textContent = total.횟수>0 && total.수강인원>0 ? `회당 평균 ${Math.round(total.수강인원/total.횟수)}명` : '수강인원 미기재 제외';
+
+  // ③ 차트
+  const labels   = monthly.map(m => m.label);
+  const 매출Data = monthly.map(m => Math.round(m.강사비/10000));
+  const 순익Data = monthly.map(m => Math.round(m.순수익/10000));
+  const 횟수Data = monthly.map(m => m.횟수);
+
+  const chartOpts = {
+    responsive:true, maintainAspectRatio:false,
+    plugins:{legend:{display:false}},
+    scales:{
+      x:{grid:{display:false}, ticks:{font:{size: isAll?9:11}, color:'#A8B5A9', maxRotation:0}, border:{display:false}},
+      y:{grid:{color:'rgba(0,0,0,0.06)'}, ticks:{font:{size:11}, color:'#A8B5A9'}, border:{display:false}}
+    }
+  };
+
+  if (revenueChart) revenueChart.destroy();
+  revenueChart = new Chart(document.getElementById('revenueChart'), {
+    type:'bar',
+    data:{labels, datasets:[
+      {label:'강사비', data:매출Data, backgroundColor:'#9FE1CB', borderRadius:4, borderSkipped:false},
+      {label:'순수익', data:순익Data, backgroundColor:'#1D9E75', borderRadius:4, borderSkipped:false}
+    ]},
+    options:{...chartOpts, plugins:{legend:{display:false}, tooltip:{callbacks:{label:ctx=>`${ctx.dataset.label}: ${ctx.parsed.y}만원`}}}}
+  });
+
+  if (countChart) countChart.destroy();
+  countChart = new Chart(document.getElementById('countChart'), {
+    type:'bar',
+    data:{labels, datasets:[{label:'강의 횟수', data:횟수Data, backgroundColor:'#FAC775', borderRadius:4, borderSkipped:false}]},
+    options:{...chartOpts, plugins:{legend:{display:false}, tooltip:{callbacks:{label:ctx=>`${ctx.parsed.y}회`}}}}
+  });
+
+  // ④ 월별 테이블
+  const tbody = document.getElementById('tableBody');
+  tbody.innerHTML = '';
+
+  let prevYear = null;
+  monthly.forEach((m, i) => {
+    // 통합 모드에서 연도 구분 행 삽입
+    if (isAll && m.year !== prevYear) {
+      const sepRow = document.createElement('tr');
+      sepRow.className = 'year-row';
+      sepRow.innerHTML = `<td colspan="6">${m.year}년</td>`;
+      tbody.appendChild(sepRow);
+      prevYear = m.year;
+    }
+
+    const isCur = (m.year === todayYr && m.month === todayMo);
+    const tr = document.createElement('tr');
+    if (isCur) tr.className = 'cur-row';
+    tr.innerHTML = `
+      <td>${m.label}${isCur?'<span class="cur-badge">현재</span>':''}</td>
+      <td class="${m.횟수?'':'muted'}">${m.횟수||'-'}</td>
+      <td class="${m.강사비?'':'muted'}">${m.강사비?fmt(m.강사비):'-'}</td>
+      <td class="${m.매출?'':'muted'}">${m.매출?fmt(m.매출):'-'}</td>
+      <td class="${m.순수익?'net':'muted'}">${m.순수익?fmt(m.순수익):'-'}</td>
+      <td class="${m.시간?'':'muted'}">${m.시간?m.시간.toFixed(1)+'h':'-'}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  document.getElementById('tableFooter').innerHTML = `
+    <td>합계</td>
+    <td>${total.횟수}회</td>
+    <td>${fmt(total.강사비)}</td>
+    <td>${fmt(total.매출)}</td>
+    <td class="net">${fmt(total.순수익)}</td>
+    <td>${total.시간.toFixed(1)}h</td>
+  `;
+
+  // ⑤ 입금 현황
+  document.getElementById('pay-done').textContent = fmt(paidAmount);
+  document.getElementById('pay-done-sub').textContent = `완료 ${paidCount}건`;
+  document.getElementById('pay-undone').textContent = fmt(unpaidAmount);
+  document.getElementById('pay-undone-sub').textContent = `${unpaidEvents.length}건 · 입금확인 기재 시 자동 반영`;
+
+  // ⑥ 미입금 리스트
+  const listEl = document.getElementById('unpaidList');
+  listEl.innerHTML = '';
+  if (unpaidEvents.length === 0) {
+    listEl.innerHTML = '<div class="empty-state">🎉 미입금 강의가 없습니다!</div>';
+  } else {
+    unpaidEvents.forEach(ev => {
+      const cls = ev.diffDays >= 60 ? 'overdue-long' : ev.diffDays >= 30 ? 'overdue-mid' : 'overdue-short';
+      const div = document.createElement('div');
+      div.className = `unpaid-item ${cls}`;
+      const dateStr = ev.date.toLocaleDateString('ko-KR',{year:'numeric',month:'long',day:'numeric',weekday:'short'});
+      const badgeColor = ev.status==='전액 미입금'?'#C0392B':ev.status==='강사비 미입금'?'#B7791F':ev.status==='재료비 미입금'?'#2563EB':'#6B7A6C';
+      let amtHTML = `<div class="unpaid-amount">${fmt(ev.미입금합계)}</div>`;
+      if (ev.미입금강사비>0 && ev.미입금재료비>0) amtHTML += `<div class="unpaid-days">강사비 ${fmt(ev.미입금강사비)} · 재료비 ${fmt(ev.미입금재료비)}</div>`;
+      else if (ev.미입금강사비>0) amtHTML += `<div class="unpaid-days">강사비 ${fmt(ev.미입금강사비)}</div>`;
+      else amtHTML += `<div class="unpaid-days">재료비 ${fmt(ev.미입금재료비)}</div>`;
+      amtHTML += `<div class="unpaid-days" style="margin-top:3px">${ev.diffDays}일 경과</div>`;
+      div.innerHTML = `
+        <div class="unpaid-left">
+          <div class="unpaid-title">${ev.title}
+            <span style="font-size:10px;font-weight:600;color:${badgeColor};background:${badgeColor}18;border:1px solid ${badgeColor}30;border-radius:4px;padding:1px 7px;margin-left:6px;vertical-align:middle">${ev.status}</span>
+          </div>
+          <div class="unpaid-org">${ev.기관||''}</div>
+          <div class="unpaid-date">📅 ${dateStr}</div>
+        </div>
+        <div class="unpaid-right">${amtHTML}</div>
+      `;
+      listEl.appendChild(div);
+    });
+  }
+
+  const rangeLabel = isAll ? '2025~2026' : mode;
+  document.getElementById('footerNote').textContent = `${total.횟수}개 강의 일정 · ${rangeLabel}년 · Google Calendar 실시간 연동`;
+}
+
+// ── 인증/로딩 ──
+function loadCredentials(input) {
+  const file = input.files[0]; if (!file) return;
+  const calId = document.getElementById('inputCalendarId').value.trim();
+  const name  = document.getElementById('inputName').value.trim();
+  if (!calId) { showError('캘린더 ID를 입력해주세요.'); return; }
+  const reader = new FileReader();
+  reader.onload = async e => {
+    try {
+      const creds = JSON.parse(e.target.result);
+      if (!creds.client_email || !creds.private_key) throw new Error('올바른 서비스 계정 JSON 파일이 아닙니다.');
+      CALENDAR_ID = calId;
+      localStorage.setItem('mc_creds', e.target.result);
+      localStorage.setItem('mc_calendar_id', calId);
+      localStorage.setItem('mc_name', name || '내 강의 현황');
+      showError('');
+      await startDashboard(creds);
+    } catch(err) { showError(err.message); }
+  };
+  reader.readAsText(file);
+}
+
+function showError(msg) { const el=document.getElementById('setupError'); el.style.display=msg?'block':'none'; el.textContent=msg; }
+function showLoading(msg) { const bar=document.getElementById('loadingBar'); bar.style.display=msg?'flex':'none'; if(msg) document.getElementById('loadingMsg').textContent=msg; }
+
+async function startDashboard(creds, mode) {
+  mode = mode || currentMode;
+  // 저장된 캘린더ID·이름 복원
+  const savedCalId = localStorage.getItem('mc_calendar_id');
+  const savedName  = localStorage.getItem('mc_name');
+  if (savedCalId) CALENDAR_ID = savedCalId;
+  if (savedName) {
+    const brand = document.getElementById('topBrand');
+    if (brand) brand.textContent = savedName;
+  }
+  document.getElementById('setup').style.display = 'none';
+  document.getElementById('dashboard').style.display = 'block';
+  document.getElementById('topTitle').textContent = getModeLabel(mode);
+  showLoading('Google 인증 중...');
+  try {
+    const token = await getAccessToken(creds);
+    showLoading('캘린더 일정 불러오는 중...');
+    const items = await fetchEvents(token, mode);
+    showLoading('데이터 분석 중...');
+    renderDashboard(parseEvents(items, mode), mode);
+    document.getElementById('updatedTime').textContent =
+      new Date().toLocaleString('ko-KR',{month:'long',day:'numeric',hour:'2-digit',minute:'2-digit'})+' 기준';
+  } catch(err) { alert('오류: '+err.message); }
+  finally { showLoading(null); }
+}
+
+async function refresh() {
+  const saved = localStorage.getItem('mc_creds');
+  if (!saved) { resetCredentials(); return; }
+  await startDashboard(JSON.parse(saved), currentMode);
+}
+function resetCredentials() { localStorage.removeItem('mc_creds'); localStorage.removeItem('mc_calendar_id'); localStorage.removeItem('mc_name'); location.reload(); }
+
+window.addEventListener('DOMContentLoaded', async () => {
+  const saved = localStorage.getItem('mc_creds');
+  if (saved) { try { await startDashboard(JSON.parse(saved), '2026'); } catch { resetCredentials(); } }
+  const zone = document.getElementById('fileZone');
+  zone.addEventListener('dragover', e=>{e.preventDefault();zone.style.borderColor='var(--primary)'});
+  zone.addEventListener('dragleave', ()=>{zone.style.borderColor='var(--border)'});
+  zone.addEventListener('drop', e=>{
+    e.preventDefault(); zone.style.borderColor='var(--border)';
+    const file=e.dataTransfer.files[0];
+    if(file){const input=document.getElementById('jsonFile');const dt=new DataTransfer();dt.items.add(file);input.files=dt.files;loadCredentials(input);}
+  });
+});
+</script>
+</body>
+</html>
